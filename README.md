@@ -1,185 +1,124 @@
-## KinoFlow: Synchronized YouTube Watch Party Platform
+# KinoFlow: Synchronized YouTube Watch Party Platform
 
-A low-latency, real-time shared cinema application powered by WebSockets, React, Node.js, and the native YouTube IFrame Player API.
+A low-latency, real-time shared cinema application powered by **WebSockets (Socket.IO)**, **React 19**, **Node.js / Express**, and the **Native YouTube IFrame Player API**.
 
-## Live Production Deployment
+---
 
-- Frontend (Vercel): https://kinoflow-three.vercel.app/ [URL 🔗](https://kinoflow-three.vercel.app/)
+## 1. Live Production Deployment
 
-- Backend WebSocket Service (Render): https://kinoflow-backend.onrender.com/ [URL 🔗](https://kinoflow-backend.onrender.com/)
+- **Frontend (Vercel):** [https://kinoflow-three.vercel.app/](https://kinoflow-three.vercel.app/)
+- **Backend WebSocket Service (Render):** [https://kinoflow-backend.onrender.com/](https://kinoflow-backend.onrender.com/)
 
-## Repository Short Description (About Section)
+---
 
-Real-time synchronized YouTube watch party system featuring room-based WebSockets, strict role-based access co
+## 2. Setup and Run Instructions
 
-Topics / Tags: react nodejs socket-io websockets youtube-iframe-api watch-party realtime tailwind-css javascript
+### Prerequisites
+- **Node.js** (v18.x or higher)
+- **npm** (v9.x or higher)
+- **Git**
 
-## Overview
+### Local Development Setup
 
-KinoFlow is a full-stack, real-time shared video theater platform engineered to eliminate playback drift, buffer loopbacks, and state desynchronization across distributed networks.
-
-The application allows users to create ephemeral watch party rooms, invite peers through 6-character room codes or direct links, communicate via real-time chat, and watch YouTube streams in unified frame lock. All timeline actions (play, pause, seek, and video changes) propagate across connected clients with sub-second accuracy.
-
-## Key Features
-
-- Sub-Second Playback Synchronization:
-
-- Network transit latency compensation calculates transit lag ( TargetTime = ServerTime +Δt).
-
-- Periodic 4-second heartbeat updates keep long-running videos aligned.
-
-- Programmatic 1.5-second time-lock (lastProgrammaticTime) suppresses intermediate YouTube player state-change loops (such as buffering and resolution switching).
-
-## Ephemeral Room-Based Architecture:
-
-- Dynamic alphanumeric 6-character room code generation.
-
-- Zero persistent storage overhead: in-memory state models ensure high-throughput, low-latency execution with automated server garbage collection when rooms empty.
-
-- Strict Role-Based Access Control (RBAC):
-
-- Host (Room Creator): Full control over playback, video loading, member role promotions, and participant removal.
-
-- Moderator (Host-Promoted): Authorized shared remote controls (play, pause, seek, and video loading).
-
-- Participant (Default Joiner): Spectator mode with personal audio volume, closed captions (CC), speed, and stream quality options. Direct attempts to alter the playback timeline trigger automated snap-back to the Host's position.
-
-- Roster Management and Actions Menu:
-
-- Dynamic participant sidebar displaying user roles, connection indicators, and avatars.
-
-- Contextual 3-dots actions menu (...) accessible by the Host to assign Moderator privileges or remove participants.
-
-- Immediate kick event handler terminates target user sessions cleanly and returns them to the landing view.
-
-## Session Rehydration:
-
-- Persistent tab reconnection using sessionStorage and socket reconnect handshakes (reconnect_room).
-
-- Reusable socket service pattern preserves bound event listeners across rejoining and page reloads without requiring manual browser refreshes.
-
-- Integrated Cinema Chat:
-
-
-## Architecture and WebSocket Data Flow
-
-```
-[Host Client] [WebSocket Server] [Participant Client]
-| | |
-|--- player_action (play/seek) ->| |
-| { time, action } |--- playback_broadcast ------>|
-| | { time, action, sentAt } |--- Set Time-Lock (1.5s)
-| | |--- seekTo() & playVideo()
-| | |
-| |<- request_sync (onReady) -----|
-| |--- sync_state --------------->| (Applies Host State)
-| | |
-|--- promote_user ------------->| |
-| { targetUserId, role } |--- role_assigned ------------>| (Unlocks Control Panel)
-| |--- room_update (broadcast) -->|
-```
-
-## Technical Stack
-
-| Layer | Technology | Purpose |
-| --- | --- | --- |
-| Frontend | React 18, Vite | Component architecture, virtual DOM updates, fast HMR |
-| Styling | Tailwind CSS | Dark cinema theme, glassmorphic layout overlays |
-|   | Real-time Client Socket.IO Client | Bidirectional event emissions and state reconnect loops |
-| Media Engine YouTube IFrame Player API Video embedding and programmatic playback controls |   |   |
-| Backend | Node.js, Express | Modular HTTP server, lifecycle routing |
-| Real-time Engine Socket.IO |   | Room management, role authorization, event broadcasting |
-| State Storage In-Memory (JavaScript OOP) Zero-latency ephemeral room state management |   |   |
-
-## WebSocket Events Reference
-
-## Client to Server
-
-| Event | Payload | Description | Access Level |
-| --- | --- | --- | --- |
-| create_room | { roomId, username } | Initializes a room; assigns caller as Host | Any user |
-| join_room | { roomId, username } | Joins an existing room as a Participant | Any user |
-|   | reconnect_room { roomId, username, role } | Re-attaches session upon tab reload | Any user |
-| request_sync | { roomId } | Requests current playback state on player | Any user |
-|   |   | ready |   |
-| player_action | { roomId, action, time } | Broadcasts play, pause, or seek command | Host, |
-|   |   |   | Moderator |
-| change_video | { roomId, videoId } | Updates active YouTube video ID | Host, |
-|   |   |   | Moderator |
-| promote_user | { roomId, targetUserId, newRole | Updates user role (e.g. Moderator) | Host only |
-| } |   |   |   |
-|   | remove_participant { roomId, targetUserId } | Removes target user from watchroom | Host only |
-| send_message | { roomId, message } | Dispatches chat text to the room channel | Any user |
-
-
-## Server to Client
-
-| Event | Payload | Description |
-| --- | --- | --- |
-| room_created | { roomId, role, participants } | Confirms room creation to creator |
-| room_joined | { roomId, role, username, participants } | Confirms room entry to joiner |
-| room_reconnected | { roomId, role, username, participants, | Re-establishes state after refresh |
-|   | initialState } |   |
-| sync_state | { videoId, playState, currentTime } | Sends current timeline state |
-|   | playback_broadcast { action, time, sentAt } | Forwards validated playback events with |
-|   |   | timestamp |
-| video_changed { videoId } |   | Notifies clients to switch active video stream |
-| room_update | { participants } | Broadcasts updated participant roster |
-| role_assigned { role } |   | Notifies individual user of an assigned role |
-|   |   | update |
-| participant_removed { roomId } |   | Informs target user that they were removed |
-| host_changed | { hostId, hostName } | Notifies room of automated Host promotion |
-| new_message | { username, role, message, timestamp } | Forwards chat message to room participants |
-
-## Getting Started
-
-## Prerequisites
-
-- Node.js (version 18.x or higher)
-
-- npm (version 9.x or higher)
-
-## Installation
-
-```
-1. Clone the repository:
-git clone https://github.com/your-username/KinoFlow.git
+#### 1. Clone the repository
+```bash
+git clone https://github.com/raviitsme/KinoFlow.git
 cd KinoFlow
-2. Setup and run Backend:
+```
+
+#### 2. Run the Backend Service
+```bash
 cd backend
 npm install
 node server.js
-The backend server will listen on http://localhost:5000.
-3. Setup and run Frontend:
-cd ../frontend
-npm install
-npm run dev
-Open http://localhost:5173 in your browser.
+# The WebSocket & Express server will listen on http://localhost:5000
 ```
 
-## Production Deployment
+#### 3. Run the Frontend Client
+In a new terminal window:
+```bash
+cd frontend
+npm install
+npm run dev
+# The Vite development server will start at http://localhost:5173
+```
 
-## Backend (Render)
+#### Environment Variables (`frontend/.env`)
+| Variable | Description | Default Local | Production Example |
+| :--- | :--- | :--- | :--- |
+| `VITE_WS_URL` | WebSocket Server endpoint | `http://localhost:5000` | `https://kinoflow-backend.onrender.com` |
 
-- Deployment URL: https://kinoflow-backend.onrender.com/ [URL 🔗](https://kinoflow-backend.onrender.com/)
+---
 
-- Root Directory: backend
+## 3. Architecture Overview: How WebSockets Integrate with the Flow
 
-- Build Command: npm install
+KinoFlow is built around an **in-memory, ephemeral room-based architecture** coordinated in real-time through **Socket.IO**:
 
+```text
+ ┌────────────────┐          WebSocket Event          ┌────────────────────┐
+ │  Host Client   │ ─────────────────────────────────> │  Socket.IO Server  │
+ └────────────────┘   player_action / change_video    └────────────────────┘
+                                                                 │
+                                                    playback_broadcast
+                                                                 │
+                                                                 ▼
+                                                      ┌────────────────────┐
+                                                      │ Participant Client │
+                                                      └────────────────────┘
+```
 
-- Start Command: node server.js
+### End-to-End WebSocket Flow:
+1. **Room Creation & Handshake:**
+   - Host emits `create_room`. Server creates in-memory room state (`videoId`, `playState`, `currentTime`, `participants`) and assigns `Host` role.
+   - Joiners emit `join_room` and receive initial room state via `sync_state`.
+2. **Synchronized Playback (Sub-Second Frame Lock):**
+   - When the Host or Moderator triggers `play`, `pause`, or `seek`, the client emits `player_action`.
+   - The server validates the sender's role and immediately broadcasts `playback_broadcast` to all room peers.
+   - Peer players apply the state with **latency compensation** and a programmatic **time-lock** to prevent feedback echo loops.
+   - The Host sends periodic `sync` heartbeats every 4 seconds to maintain long-running drift alignment (<500ms).
+3. **Participant Change Request & Approval System:**
+   - Participants cannot modify the timeline directly. If a participant wants to change the video, they emit `request_change`.
+   - The server routes this request directly to active Hosts and Moderators (`incoming_change_request`).
+   - Host/Moderator clicks **Approve** or **Decline** (`resolve_change_request`).
+   - Upon approval, the server triggers `video_changed` across the room and informs the requesting participant.
+4. **Session Rehydration & Self-Healing:**
+   - Browser tabs store room session in `sessionStorage`. On page refresh, clients emit `reconnect_room` to recover role and video timestamp without room teardown.
+   - If the Host disconnects, the server auto-promotes the next senior participant to Host via `host_changed`.
 
-## Frontend (Vercel)
+---
 
-- Deployment URL: https://kinoflow-three.vercel.app/ [URL 🔗](https://kinoflow-three.vercel.app/)
+## 4. Code Walkthrough Readiness: Technologies & Logic Breakdown
 
-- Root Directory: frontend
+### A. Technologies Used
+- **React 19 & Vite:** Ultra-fast compilation, reactive component lifecycle hooks (`useRef` for YouTube player instances to avoid re-renders, `useState` for roster/chat).
+- **Socket.IO & Node.js:** Full-duplex WebSocket connections with fallback to long-polling, room-level socket grouping (`socket.join(roomId)`), and targeted peer messaging (`io.to(id)`).
+- **Tailwind CSS v4:** Cinema dark-theme layout, glassmorphic floating overlays, and custom animations (`fadeIn`, `pulse`).
+- **YouTube IFrame Player API:** Low-level programmatic player control (`seekTo`, `playVideo`, `pauseVideo`, `loadVideoById`).
 
-- Build Command: npm run build
+### B. Core Logic & Problem-Solving Mechanisms
 
-- Output Directory: dist
+| Challenge | Solution in KinoFlow |
+| :--- | :--- |
+| **Playback Drift & Transit Delay** | Emits lightweight timeline events with assumed network transit compensation ($\Delta t = 200\text{ms}$). Participants adjust without waiting for full buffer reload. |
+| **Infinite Event Feedback Loops** | Managed via `lastProgrammaticTime` (time-lock window). Prevents YouTube API state changes triggered programmatically from firing reciprocal socket broadcasts. |
+| **Clock Desynchronization** | Avoids relying on client-vs-server timestamps (`Date.now() - sentAt`), using drift differentials (`drift = |localTime - targetTime|`). Hard seeking only triggers when drift $>0.5\text{s}$. |
+| **Role-Based Access Control (RBAC)** | Strict server-side verification: unauthorized participants cannot emit `player_action`, `change_video`, or role promotions. |
+| **Participant Request Approvals** | Non-blocking modal queue for Hosts/Moderators to approve or reject suggestions in real time. |
+| **Zero Database Overhead** | Fully ephemeral in-memory state model; rooms automatically clean up from server RAM when all members leave. |
 
-- Environment Variables:
+---
 
-- VITE_WS_URL: https://kinoflow-backend.onrender.com
+## 5. WebSocket Event Reference
+
+| Event Name | Direction | Access Role | Purpose |
+| :--- | :--- | :--- | :--- |
+| `create_room` | Client $\rightarrow$ Server | Anyone | Initialize a new room; assign Host |
+| `join_room` | Client $\rightarrow$ Server | Anyone | Join existing room as Participant |
+| `player_action` | Client $\rightarrow$ Server | Host, Moderator | Broadcast play, pause, or seek |
+| `request_change` | Client $\rightarrow$ Server | Participant | Propose video change to Host |
+| `resolve_change_request` | Client $\rightarrow$ Server | Host, Moderator | Approve or decline change proposal |
+| `incoming_change_request`| Server $\rightarrow$ Client | Host, Moderator | Notify controllers of pending request |
+| `request_response` | Server $\rightarrow$ Client | Participant | Notify requester of approval/rejection |
+| `playback_broadcast` | Server $\rightarrow$ Client | All Room Members | Broadcast timeline position & action |
+| `video_changed` | Server $\rightarrow$ Client | All Room Members | Switch YouTube video ID across room |
+| `host_changed` | Server $\rightarrow$ Client | All Room Members | Announce auto-promoted Host upon disconnect |
