@@ -21,29 +21,6 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
   };
 
   useEffect(() => {
-    // ... existing listeners ...
-    // Listen for incoming change requests (For Host/Moderator only)
-    const handleIncomingRequest = (request) => {
-      setPendingRequests((prev) => [...prev, request]);
-    };
-    socketService.on("incoming_change_request", handleIncomingRequest);
-    // ...
-  }, []);
-  // ...
-    const handleResolveRequest = (request, isApproved) => {
-    // Send decision to backend
-    socketService.resolveChangeRequest(roomId, request, isApproved);
-    
-    // Remove from pending list immediately
-    setPendingRequests(prev => prev.filter(r => r.requestId !== request.requestId));
-
-    if (isApproved) {
-      showNotification(`${request.senderUsername} can now control playback!`);
-    }
-  };
-
-
-  useEffect(() => {
     // 1. Listen for user list updates
     const handleRoomUpdate = (data) => {
       if (data.participants) {
@@ -69,16 +46,34 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
       showNotification(`Your role was updated to: ${role}`);
     };
 
+    // 4. Listen for incoming change requests (For Host/Moderator)
+    const handleIncomingRequest = (request) => {
+      setPendingRequests((prev) => [...prev, request]);
+    };
+
     socketService.on("room_update", handleRoomUpdate);
     socketService.on("host_changed", handleHostChanged);
     socketService.on("role_assigned", handleRoleAssigned);
+    socketService.on("incoming_change_request", handleIncomingRequest);
 
     return () => {
       socketService.off("room_update", handleRoomUpdate);
       socketService.off("host_changed", handleHostChanged);
       socketService.off("role_assigned", handleRoleAssigned);
+      socketService.off("incoming_change_request", handleIncomingRequest);
     };
   }, []);
+
+  const handleResolveRequest = (request, isApproved) => {
+    socketService.resolveChangeRequest(roomId, request, isApproved);
+    setPendingRequests((prev) => prev.filter((r) => r.requestId !== request.requestId));
+
+    if (isApproved) {
+      showNotification(`Approved ${request.senderUsername}'s video request!`);
+    } else {
+      showNotification(`Declined request from ${request.senderUsername}.`);
+    }
+  };
 
   const handleExit = () => {
     sessionStorage.removeItem("kinoflow_session");
@@ -136,36 +131,38 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
 
         {/* Requests Popup for Host/Moderator */}
       {canControl && pendingRequests.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 w-80">
-          <div className="bg-brand-charcoal border border-brand-border rounded-lg shadow-2xl overflow-hidden">
-            <div className="bg-brand-red/10 border-b border-brand-red/30 px-4 py-2 text-xs font-bold uppercase tracking-wide text-brand-white flex justify-between items-center">
+        <div className="fixed bottom-4 right-4 z-50 w-80 animate-fadeIn">
+          <div className="bg-brand-charcoal border border-brand-border rounded-xl shadow-2xl overflow-hidden">
+            <div className="bg-brand-red/10 border-b border-brand-red/30 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-brand-white flex justify-between items-center">
               <span>Pending Requests ({pendingRequests.length})</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-red/20 border border-brand-red/30">!
-                )
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-red/20 border border-brand-red/30 text-brand-red font-bold">
+                ACTION REQUIRED
               </span>
             </div>
-            <div className="max-h-60 overflow-y-auto custom-scrollbar p-3">
+            <div className="max-h-60 overflow-y-auto p-3 space-y-2">
               {pendingRequests.map((req) => (
                 <div
                   key={req.requestId}
-                  className="mb-2 p-3 rounded-lg bg-brand-black border border-brand-border text-xs"
+                  className="p-3 rounded-lg bg-brand-black border border-brand-border text-xs"
                 >
-                  <p className="text-brand-white mb-1 font-semibold">{req.senderUsername} wants to...</p>
+                  <p className="text-brand-white mb-1 font-semibold">
+                    <strong className="text-brand-red">{req.senderUsername}</strong> wants to change video:
+                  </p>
                   {req.type === "change_video" && req.payload?.videoId && (
                     <>
-                      <p className="text-brand-muted truncate">
-                        Play: {req.payload.videoId}
+                      <p className="text-brand-muted font-mono text-[11px] truncate mb-2">
+                        YouTube ID: {req.payload.videoId}
                       </p>
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleResolveRequest(req, true)}
-                          className="flex-1 bg-brand-green/20 text-brand-green hover:bg-brand-green/30 border border-brand-green/40 rounded py-1 transition-colors font-medium"
+                          className="flex-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/40 rounded-lg py-1.5 transition-colors font-semibold cursor-pointer"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => handleResolveRequest(req, false)}
-                          className="flex-1 bg-brand-red/20 text-brand-red hover:bg-brand-red/30 border border-brand-red/40 rounded py-1 transition-colors font-medium"
+                          className="flex-1 bg-brand-red/20 text-brand-red hover:bg-brand-red/30 border border-brand-red/40 rounded-lg py-1.5 transition-colors font-semibold cursor-pointer"
                         >
                           Decline
                         </button>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import socketService from '../../services/socketService';
+import extractYoutubeId from '../../utils/youtube';
 
 // A seek/play/pause we trigger ourselves produces state events for a while.
 // Ignore those events during this window so we never react to our own actions.
@@ -19,6 +20,31 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
   const [playerReady, setPlayerReady] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const [requestUrl, setRequestUrl] = useState("");
+  const [requestStatus, setRequestStatus] = useState(null);
+
+  useEffect(() => {
+    const handleResponse = ({ message, approved }) => {
+      setRequestStatus(approved ? `✅ ${message}` : `❌ ${message}`);
+      setTimeout(() => setRequestStatus(''), 5000);
+    };
+    socketService.on('request_response', handleResponse);
+    return () => socketService.off('request_response', handleResponse);
+  }, []);
+  const handleSendRequest = (e) => {
+    e.preventDefault();
+    const videoId = extractYoutubeId(requestUrl);
+    if (!videoId) {
+      setRequestStatus('⚠️ Please enter a valid YouTube link.');
+      setTimeout(() => setRequestStatus(''), 4000);
+      return;
+    }
+    socketService.requestChange(roomId, 'change_video', { videoId });
+    setRequestUrl('');
+    setRequestStatus('⏳ Request sent to host, awaiting approval...');
+  };
+
 
   // Personal preferences
   const [volume, setVolume] = useState(50);
@@ -80,8 +106,8 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
         videoId: initialVideoIdRef.current || 'LXb3EKWsInQ',
         playerVars: {
           autoplay: 0,
-          controls: 1, 
-          disablekb: 1, 
+          controls: 1,
+          disablekb: 1,
           fs: 1,
           modestbranding: 1,
           rel: 0,
@@ -124,7 +150,7 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
       playerRef.current = null;
       setPlayerReady(false);
     };
-  }, []); 
+  }, []);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -153,12 +179,12 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
       else player.pauseVideo();
     };
 
-      const handlePlaybackBroadcast = ({ action, time }) => {
+    const handlePlaybackBroadcast = ({ action, time }) => {
       const player = playerRef.current;
       if (!player || typeof player.getCurrentTime !== 'function') return;
 
       lock();
-      
+
       // FIX: Add a small buffer to the target time when playing to account for network/startup lag
       const latencyCompensation = action === 'play' ? 0.3 : 0;
       const target = Number(time) + latencyCompensation;
@@ -167,11 +193,11 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
       if (action === 'pause') desiredState.current = 'paused';
 
       const drift = Math.abs(player.getCurrentTime() - target);
-      
+
       // FIX: Differentiate between a manual 'seek' and a background 'sync'
       if (action === 'seek') {
         player.seekTo(target, true);
-      } else if (drift > 0.5) { 
+      } else if (drift > 0.5) {
         // Only seek if the drift is noticeably large (> 0.5s)
         player.seekTo(target, true);
       }
@@ -366,6 +392,29 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
         </div>
       </div>
 
+      {/* Participant Video Suggestion Form */}
+      <form onSubmit={handleSendRequest} className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-brand-border/40">
+        <input
+          type="text"
+          value={requestUrl}
+          onChange={(e) => setRequestUrl(e.target.value)}
+          placeholder="Suggest a YouTube URL to the host..."
+          className="flex-1 bg-brand-black border border-brand-border/80 rounded-xl px-4 py-2 text-xs text-brand-white placeholder:text-brand-muted focus:outline-none focus:border-brand-red transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={!requestUrl.trim()}
+          className="px-4 py-2 bg-brand-charcoal hover:bg-brand-border border border-brand-border text-brand-white font-semibold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-40"
+        >
+          Request Video
+        </button>
+      </form>
+
+      {requestStatus && (
+        <p className="text-xs font-medium text-brand-white/80 animate-fadeIn">{requestStatus}</p>
+      )}
+
+
       {/* Spectator options panel */}
       <div className="bg-brand-charcoal/40 border border-brand-border/60 rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -394,11 +443,10 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
             {/* CC */}
             <button
               onClick={handleToggleCC}
-              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${
-                ccActive
-                  ? 'bg-brand-red/20 border-brand-red/40 text-brand-red'
-                  : 'bg-brand-black/40 border-brand-border/60 text-brand-muted hover:text-brand-white'
-              }`}
+              className={`px-3 py-2 rounded-xl text-xs font-bold uppercase transition-all cursor-pointer border ${ccActive
+                ? 'bg-brand-red/20 border-brand-red/40 text-brand-red'
+                : 'bg-brand-black/40 border-brand-border/60 text-brand-muted hover:text-brand-white'
+                }`}
             >
               CC Subtitles
             </button>
