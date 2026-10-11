@@ -56,7 +56,7 @@ KinoFlow is built around an **in-memory, ephemeral room-based architecture** coo
 
 ```text
  ┌────────────────┐          WebSocket Event          ┌────────────────────┐
- │  Host Client   │ ─────────────────────────────────> │  Socket.IO Server  │
+ │  Host Client   │ ─────────────────────────────────>│  Socket.IO Server  │
  └────────────────┘   player_action / change_video    └────────────────────┘
                                                                  │
                                                     playback_broadcast
