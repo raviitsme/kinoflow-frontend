@@ -68,6 +68,26 @@ class SocketService {
     }
   }
 
+  requestChange(roomId, type, payload) {
+    if (this.socket) {
+      this.socket.emit("request_change", { roomId, type, payload });
+    }
+  }
+
+  resolveChangeRequest(roomId, requestData, approved) {
+    if (this.socket) {
+      this.socket.emit("resolve_change_request", {
+        roomId,
+        requestId: requestData.requestId,
+        senderId: requestData.senderId,
+        approved,
+        type: requestData.type,
+        payload: requestData.payload,
+      });
+    }
+  }
+
+
   on(event, callback) {
     this.connect();
     this.socket.on(event, callback);

@@ -8,6 +8,7 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
   const [participants, setParticipants] = useState(roomData.participants || []);
   const [myRole, setMyRole] = useState(roomData.role || "Participant");
   const [notification, setNotification] = useState("");
+  const [pendingRequests, setPendingRequests] = useState([]);
 
   const roomId = roomData.roomId;
   const isHost = myRole === "Host";
@@ -18,6 +19,29 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
     setNotification(msg);
     setTimeout(() => setNotification(""), 4000);
   };
+
+  useEffect(() => {
+    // ... existing listeners ...
+    // Listen for incoming change requests (For Host/Moderator only)
+    const handleIncomingRequest = (request) => {
+      setPendingRequests((prev) => [...prev, request]);
+    };
+    socketService.on("incoming_change_request", handleIncomingRequest);
+    // ...
+  }, []);
+  // ...
+    const handleResolveRequest = (request, isApproved) => {
+    // Send decision to backend
+    socketService.resolveChangeRequest(roomId, request, isApproved);
+    
+    // Remove from pending list immediately
+    setPendingRequests(prev => prev.filter(r => r.requestId !== request.requestId));
+
+    if (isApproved) {
+      showNotification(`${request.senderUsername} can now control playback!`);
+    }
+  };
+
 
   useEffect(() => {
     // 1. Listen for user list updates
@@ -107,6 +131,51 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
       {notification && (
         <div className="bg-brand-red/10 border-b border-brand-red/30 text-brand-white text-xs px-4 py-2 text-center font-medium animate-fadeIn">
           {notification}
+        </div>
+      )}
+
+        {/* Requests Popup for Host/Moderator */}
+      {canControl && pendingRequests.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 w-80">
+          <div className="bg-brand-charcoal border border-brand-border rounded-lg shadow-2xl overflow-hidden">
+            <div className="bg-brand-red/10 border-b border-brand-red/30 px-4 py-2 text-xs font-bold uppercase tracking-wide text-brand-white flex justify-between items-center">
+              <span>Pending Requests ({pendingRequests.length})</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-red/20 border border-brand-red/30">!
+                )
+              </span>
+            </div>
+            <div className="max-h-60 overflow-y-auto custom-scrollbar p-3">
+              {pendingRequests.map((req) => (
+                <div
+                  key={req.requestId}
+                  className="mb-2 p-3 rounded-lg bg-brand-black border border-brand-border text-xs"
+                >
+                  <p className="text-brand-white mb-1 font-semibold">{req.senderUsername} wants to...</p>
+                  {req.type === "change_video" && req.payload?.videoId && (
+                    <>
+                      <p className="text-brand-muted truncate">
+                        Play: {req.payload.videoId}
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => handleResolveRequest(req, true)}
+                          className="flex-1 bg-brand-green/20 text-brand-green hover:bg-brand-green/30 border border-brand-green/40 rounded py-1 transition-colors font-medium"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleResolveRequest(req, false)}
+                          className="flex-1 bg-brand-red/20 text-brand-red hover:bg-brand-red/30 border border-brand-red/40 rounded py-1 transition-colors font-medium"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

@@ -153,18 +153,26 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
       else player.pauseVideo();
     };
 
-    const handlePlaybackBroadcast = ({ action, time }) => {
+      const handlePlaybackBroadcast = ({ action, time }) => {
       const player = playerRef.current;
       if (!player || typeof player.getCurrentTime !== 'function') return;
 
       lock();
-      const target = Number(time) || 0;
+      
+      // FIX: Add a small buffer to the target time when playing to account for network/startup lag
+      const latencyCompensation = action === 'play' ? 0.3 : 0;
+      const target = Number(time) + latencyCompensation;
 
       if (action === 'play') desiredState.current = 'playing';
       if (action === 'pause') desiredState.current = 'paused';
 
       const drift = Math.abs(player.getCurrentTime() - target);
-      if (action === 'seek' || drift > DRIFT_THRESHOLD) {
+      
+      // FIX: Differentiate between a manual 'seek' and a background 'sync'
+      if (action === 'seek') {
+        player.seekTo(target, true);
+      } else if (drift > 0.5) { 
+        // Only seek if the drift is noticeably large (> 0.5s)
         player.seekTo(target, true);
       }
 
@@ -178,6 +186,7 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
         }
       }
     };
+
 
     const handleVideoChanged = ({ videoId }) => {
       const player = playerRef.current;

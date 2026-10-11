@@ -92,15 +92,17 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
 
   // 3. Listen for Incoming Actions (When the other controller plays/pauses/seeks/switches video)
   useEffect(() => {
-    const handlePlaybackBroadcast = ({ action, time, sentAt }) => {
+      const handlePlaybackBroadcast = ({ action, time }) => {
       const player = playerRef.current;
       if (!player || !playerReady) return;
 
       isIncomingSync.current = true;
       lastProgrammaticTime.current = Date.now();
 
-      const transitLatency = sentAt ? Math.max(0, (Date.now() - sentAt) / 1000) : 0;
-      const targetTime = time + (action === 'play' ? transitLatency : 0);
+      // FIX: Avoid Date.now() - sentAt due to server/client clock mismatches.
+      // Use a fixed assumed latency (e.g., 200ms) to prevent 1-2 second jumps.
+      const transitLatency = 0.2;
+      const targetTime = action === 'play' ? time + transitLatency : time;
 
       const localTime = player.getCurrentTime();
       const drift = Math.abs(localTime - targetTime);
@@ -114,10 +116,12 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
       } else if (action === 'pause') {
         player.pauseVideo();
         if (drift > 0.2) player.seekTo(time, true);
-      } else if (action === 'seek') {
-        player.seekTo(targetTime, true);
+      } else if (action === 'seek' || action === 'sync') {
+        // Handle the new 'sync' action
+        if (drift > 0.4) player.seekTo(targetTime, true);
       }
     };
+
 
     const handleVideoChanged = ({ videoId }) => {
       const player = playerRef.current;
@@ -170,7 +174,8 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         const state = player.getPlayerState();
         if (state === window.YT.PlayerState.PLAYING) {
           const time = player.getCurrentTime();
-          socketService.emitAction(roomId, 'seek', time);
+          // FIX: Change 'seek' to 'sync' so participants don't forcefully stutter every 4 seconds
+          socketService.emitAction(roomId, 'sync', time);
         }
       }
     }, 4000);
