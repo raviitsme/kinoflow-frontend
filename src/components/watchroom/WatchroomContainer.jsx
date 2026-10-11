@@ -183,7 +183,7 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
           {canControl ? (
             <HostPlayer
               roomId={roomId}
-              isHost={isHost} // 👈 Passes boolean down so only Host runs the alignment heartbeat
+              isHost={isHost} // Only the primary Host emits the periodic sync heartbeat
               currentVideoId={roomData.initialState?.videoId || "LXb3EKWsInQ"}
             />
           ) : (

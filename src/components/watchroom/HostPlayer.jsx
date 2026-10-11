@@ -99,8 +99,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
       isIncomingSync.current = true;
       lastProgrammaticTime.current = Date.now();
 
-      // FIX: Avoid Date.now() - sentAt due to server/client clock mismatches.
-      // Use a fixed assumed latency (e.g., 200ms) to prevent 1-2 second jumps.
+      // Compensate for average network transit latency (200ms) without relying on desynced system clocks
       const transitLatency = 0.2;
       const targetTime = action === 'play' ? time + transitLatency : time;
 
@@ -117,7 +116,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         player.pauseVideo();
         if (drift > 0.2) player.seekTo(time, true);
       } else if (action === 'seek' || action === 'sync') {
-        // Handle the new 'sync' action
+        // Correct drift if out of sync by more than 400ms
         if (drift > 0.4) player.seekTo(targetTime, true);
       }
     };
@@ -174,7 +173,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         const state = player.getPlayerState();
         if (state === window.YT.PlayerState.PLAYING) {
           const time = player.getCurrentTime();
-          // FIX: Change 'seek' to 'sync' so participants don't forcefully stutter every 4 seconds
+          // Broadcast periodic 'sync' heartbeat so peers align gracefully without forced seek stutters
           socketService.emitAction(roomId, 'sync', time);
         }
       }

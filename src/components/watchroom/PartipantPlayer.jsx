@@ -21,9 +21,11 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
   const [hasJoined, setHasJoined] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Participant video suggestion request states
   const [requestUrl, setRequestUrl] = useState("");
   const [requestStatus, setRequestStatus] = useState(null);
 
+  // Listen for Host/Moderator approval or rejection of change request
   useEffect(() => {
     const handleResponse = ({ message, approved }) => {
       setRequestStatus(approved ? `✅ ${message}` : `❌ ${message}`);
@@ -32,6 +34,8 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
     socketService.on('request_response', handleResponse);
     return () => socketService.off('request_response', handleResponse);
   }, []);
+
+  // Submit video suggestion request to Host/Moderators
   const handleSendRequest = (e) => {
     e.preventDefault();
     const videoId = extractYoutubeId(requestUrl);
@@ -185,7 +189,7 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
 
       lock();
 
-      // FIX: Add a small buffer to the target time when playing to account for network/startup lag
+      // Compensate for network transit lag when starting playback
       const latencyCompensation = action === 'play' ? 0.3 : 0;
       const target = Number(time) + latencyCompensation;
 
@@ -194,11 +198,10 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
 
       const drift = Math.abs(player.getCurrentTime() - target);
 
-      // FIX: Differentiate between a manual 'seek' and a background 'sync'
+      // Explicit seek snaps immediately; periodic 'sync' only corrects if drift > 500ms
       if (action === 'seek') {
         player.seekTo(target, true);
       } else if (drift > 0.5) {
-        // Only seek if the drift is noticeably large (> 0.5s)
         player.seekTo(target, true);
       }
 

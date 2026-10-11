@@ -68,12 +68,14 @@ class SocketService {
     }
   }
 
+  // Request video or playback change (for participants)
   requestChange(roomId, type, payload) {
     if (this.socket) {
       this.socket.emit("request_change", { roomId, type, payload });
     }
   }
 
+  // Resolve pending participant change request (for host/moderators)
   resolveChangeRequest(roomId, requestData, approved) {
     if (this.socket) {
       this.socket.emit("resolve_change_request", {
