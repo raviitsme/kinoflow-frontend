@@ -8,6 +8,10 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
   const isIncomingSync = useRef(false);
   const lastProgrammaticTime = useRef(Date.now());
   const initialSyncDone = useRef(false);
+  // Capture the video ID at mount time only. Keeping this in a ref (not reading
+  // the prop inside the effect) lets us remove currentVideoId from the useEffect
+  // dependency array, so the player is never destroyed/recreated on video changes.
+  const initialVideoIdRef = useRef(currentVideoId);
 
   const [inputUrl, setInputUrl] = useState('');
   const [urlError, setUrlError] = useState('');
@@ -26,7 +30,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
       if (playerRef.current) return;
 
       playerRef.current = new window.YT.Player(containerRef.current, {
-        videoId: currentVideoId || 'LXb3EKWsInQ',
+        videoId: initialVideoIdRef.current || 'LXb3EKWsInQ',
         playerVars: {
           autoplay: 0,
           controls: 1,           // Full native YouTube controls
@@ -72,7 +76,10 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         playerRef.current = null;
       }
     };
-  }, [roomId, currentVideoId]);
+  // Only roomId is a dep — currentVideoId is intentionally excluded.
+  // The player is created once; all subsequent video changes go through
+  // handleVideoChanged (triggered by the server's video_changed broadcast).
+  }, [roomId]);
 
   // 2. Broadcast Local Actions (When this Host/Moderator clicks play, pause, or scrubs)
   const handleControllerStateChange = (event) => {
@@ -181,6 +188,10 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
 
 
   // 5. Change Video URL
+  // Only emit to server — the server echoes video_changed back to all clients
+  // (including this host), so handleVideoChanged is the single load path for
+  // everyone. Calling loadVideoById here directly would cause a double-load:
+  // once immediately, then again when the echo arrives.
   const handleLoadVideo = (e) => {
     e.preventDefault();
     setUrlError('');
@@ -189,12 +200,6 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
     if (!extractedId) {
       setUrlError('Please enter a valid YouTube link.');
       return;
-    }
-
-    if (playerRef.current && typeof playerRef.current.loadVideoById === 'function') {
-      isIncomingSync.current = true;
-      lastProgrammaticTime.current = Date.now();
-      playerRef.current.loadVideoById(extractedId, 0);
     }
 
     socketService.changeVideo(roomId, extractedId);
