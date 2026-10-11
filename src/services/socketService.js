@@ -56,6 +56,12 @@ class SocketService {
     this.socket.emit("reconnect_room", { roomId, username, role });
   }
 
+  leaveRoom(roomId) {
+    if (this.socket) {
+      this.socket.emit("leave_room", { roomId });
+    }
+  }
+
   promoteUser(roomId, targetUserId, newRole) {
     if (this.socket) {
       this.socket.emit("promote_user", { roomId, targetUserId, newRole });

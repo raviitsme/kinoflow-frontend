@@ -109,6 +109,7 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
 
   const handleExit = () => {
     sessionStorage.removeItem("kinoflow_session");
+    socketService.leaveRoom(roomId);
     socketService.disconnect();
     onLeaveRoom();
   };

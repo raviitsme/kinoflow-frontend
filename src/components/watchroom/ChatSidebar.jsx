@@ -6,15 +6,17 @@ export default function ChatSidebar({ roomId, currentUser, participants }) {
   const [inputText, setInputText] = useState("");
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("chat"); // 'chat' | 'users'
-  const chatBottomRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   // State to manage the open 3-dots dropdown menu for role promotion/kicking
   const [activeMenuUserId, setActiveMenuUserId] = useState(null);
   const menuRef = useRef(null);
 
-  // Auto-scroll chat to latest message
+  // Auto-scroll chat internally to latest message without scrolling the main page
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > 0 && chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   // Listen for real-time chat messages
@@ -110,7 +112,7 @@ export default function ChatSidebar({ roomId, currentUser, participants }) {
       {activeTab === "chat" && (
         <div className="flex-1 flex flex-col justify-between overflow-hidden">
           {/* Scrollable Messages Area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center text-brand-muted text-xs p-4">
                 <span className="text-2xl mb-2">🍿</span>
@@ -155,7 +157,6 @@ export default function ChatSidebar({ roomId, currentUser, participants }) {
                 );
               })
             )}
-            <div ref={chatBottomRef} />
           </div>
 
           {/* Message Input Form */}

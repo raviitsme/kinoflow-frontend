@@ -157,24 +157,8 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
     };
   }, []);
 
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!playerReady || !player || !currentVideoId) return;
-
-    const currentId = player.getVideoData?.().video_id;
-    if (currentId !== currentVideoId) {
-      lock();
-      player.loadVideoById(currentVideoId, 0);
-      desiredState.current = 'paused';
-      player.pauseVideo?.();
-      setTimeout(() => {
-        const p = playerRef.current;
-        if (p && typeof p.getAvailableQualityLevels === 'function') {
-          setAvailableQualities(p.getAvailableQualityLevels());
-        }
-      }, 1500);
-    }
-  }, [currentVideoId, playerReady]);
+  // Note: currentVideoId is handled via handleVideoChanged socket listener
+  // to avoid double-loading or race conditions that crash the player.
 
   useEffect(() => {
     if (!playerReady) return;
@@ -220,12 +204,18 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
 
     const handleVideoChanged = ({ videoId }) => {
       const player = playerRef.current;
-      if (!player || typeof player.loadVideoById !== 'function' || !videoId) return;
+      if (!player || !videoId) return;
 
       lock();
       desiredState.current = 'paused';
-      player.loadVideoById(videoId, 0);
-      player.pauseVideo();
+      // cueVideoById prepares the player/thumbnail safely without autoplaying or aborting stream
+      if (typeof player.cueVideoById === 'function') {
+        player.cueVideoById(videoId, 0);
+      } else if (typeof player.loadVideoById === 'function') {
+        player.loadVideoById(videoId, 0);
+        player.pauseVideo?.();
+      }
+
       setTimeout(() => {
         const p = playerRef.current;
         if (p && typeof p.getAvailableQualityLevels === 'function') {

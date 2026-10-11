@@ -8,6 +8,9 @@ const SESSION_KEY = "kinoflow_session";
 export default function App() {
   const [roomData, setRoomData] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isReconnecting, setIsReconnecting] = useState(() => {
+    return !!sessionStorage.getItem(SESSION_KEY);
+  });
 
   // 1. Check for an active session on mount / page reload
   useEffect(() => {
@@ -18,10 +21,14 @@ export default function App() {
         socketService.reconnectRoom(roomId, username, role);
       } catch (err) {
         sessionStorage.removeItem(SESSION_KEY);
+        setIsReconnecting(false);
       }
+    } else {
+      setIsReconnecting(false);
     }
 
     const handleRoomCreated = (data) => {
+      setIsReconnecting(false);
       const session = {
         roomId: data.roomId,
         role: "Host",
@@ -40,6 +47,7 @@ export default function App() {
     };
 
     const handleRoomJoined = (data) => {
+      setIsReconnecting(false);
       const session = {
         roomId: data.roomId,
         role: "Participant",
@@ -58,6 +66,7 @@ export default function App() {
     };
 
     const handleRoomReconnected = (data) => {
+      setIsReconnecting(false);
       sessionStorage.setItem(
         SESSION_KEY,
         JSON.stringify({
@@ -76,12 +85,14 @@ export default function App() {
     };
 
     const handleSessionExpired = ({ message }) => {
+      setIsReconnecting(false);
       sessionStorage.removeItem(SESSION_KEY);
       setRoomData(null);
       setErrorMessage(message);
     };
 
     const handleParticipantRemoved = () => {
+      setIsReconnecting(false);
       sessionStorage.removeItem(SESSION_KEY);
       socketService.disconnect();
       setRoomData(null);
@@ -89,6 +100,7 @@ export default function App() {
     };
 
     const handleErrorMsg = ({ message }) => {
+      setIsReconnecting(false);
       setErrorMessage(message);
     };
 
@@ -128,6 +140,7 @@ export default function App() {
   // Handle Exit
   const handleLeaveRoom = () => {
     sessionStorage.removeItem(SESSION_KEY);
+    socketService.leaveRoom(roomData?.roomId);
     socketService.disconnect();
     setRoomData(null);
   };
@@ -140,7 +153,16 @@ export default function App() {
         </div>
       )}
 
-      {roomData ? (
+      {isReconnecting ? (
+        <div className="min-h-screen bg-brand-black flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4 animate-fadeIn">
+            <div className="w-12 h-12 rounded-xl bg-brand-red flex items-center justify-center font-black text-brand-white text-2xl shadow-[0_0_20px_rgba(229,9,20,0.5)] animate-pulse">
+              K
+            </div>
+            <p className="text-sm text-brand-muted font-medium">Reconnecting to your watch party...</p>
+          </div>
+        </div>
+      ) : roomData ? (
         <WatchroomContainer roomData={roomData} onLeaveRoom={handleLeaveRoom} />
       ) : (
         <LandingPage

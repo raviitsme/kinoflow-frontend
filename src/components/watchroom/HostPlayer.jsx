@@ -76,9 +76,9 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         playerRef.current = null;
       }
     };
-  // Only roomId is a dep — currentVideoId is intentionally excluded.
-  // The player is created once; all subsequent video changes go through
-  // handleVideoChanged (triggered by the server's video_changed broadcast).
+    // Only roomId is a dep — currentVideoId is intentionally excluded.
+    // The player is created once; all subsequent video changes go through
+    // handleVideoChanged (triggered by the server's video_changed broadcast).
   }, [roomId]);
 
   // 2. Broadcast Local Actions (When this Host/Moderator clicks play, pause, or scrubs)
@@ -111,7 +111,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
 
   // 3. Listen for Incoming Actions (When the other controller plays/pauses/seeks/switches video)
   useEffect(() => {
-      const handlePlaybackBroadcast = ({ action, time }) => {
+    const handlePlaybackBroadcast = ({ action, time }) => {
       const player = playerRef.current;
       if (!player || !playerReady) return;
 
@@ -182,9 +182,6 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
       socketService.off('sync_state', handleSyncState);
     };
   }, [roomId, playerReady]);
-
-  // 4. Sync heartbeat is now server-driven (socketHandler.js).
-  // No client-side interval needed here anymore.
 
 
   // 5. Change Video URL
