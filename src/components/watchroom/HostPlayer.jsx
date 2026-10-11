@@ -6,7 +6,8 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const isIncomingSync = useRef(false);
-  const lastProgrammaticTime = useRef(0);
+  const lastProgrammaticTime = useRef(Date.now());
+  const initialSyncDone = useRef(false);
 
   const [inputUrl, setInputUrl] = useState('');
   const [urlError, setUrlError] = useState('');
@@ -41,10 +42,18 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
         events: {
           onReady: () => {
             setPlayerReady(true);
-            // In case a moderator loads in while a stream is ongoing
+            isIncomingSync.current = true;
+            lastProgrammaticTime.current = Date.now();
+
+            // Request active playback state to align before enabling broadcast
             if (socketService.socket) {
               socketService.socket.emit('request_sync', { roomId });
             }
+
+            // Fallback: unlock controller if sync response takes over 2.5s
+            setTimeout(() => {
+              initialSyncDone.current = true;
+            }, 2500);
           },
           onStateChange: handleControllerStateChange,
         },
@@ -70,14 +79,17 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
     const player = playerRef.current;
     if (!player || typeof player.getCurrentTime !== 'function') return;
 
-    // Ignore changes triggered by incoming socket events from other controllers
-    if (isIncomingSync.current) {
-      isIncomingSync.current = false;
+    // Prevent newly promoted moderators from broadcasting initial mount events
+    if (!initialSyncDone.current) return;
+
+    // Ignore transitions within 1.5s of an incoming programmatic update
+    if (Date.now() - lastProgrammaticTime.current < 1500) {
       return;
     }
 
-    // Ignore transitions within 1 second of an incoming programmatic update
-    if (Date.now() - lastProgrammaticTime.current < 1000) {
+    // Ignore changes triggered by incoming socket events from other controllers
+    if (isIncomingSync.current) {
+      isIncomingSync.current = false;
       return;
     }
 
@@ -137,6 +149,7 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
 
       isIncomingSync.current = true;
       lastProgrammaticTime.current = Date.now();
+      initialSyncDone.current = true;
       const currentId = player.getVideoData?.().video_id;
 
       if (videoId && currentId !== videoId) {

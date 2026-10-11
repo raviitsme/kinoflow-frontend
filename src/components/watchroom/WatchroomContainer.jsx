@@ -7,6 +7,9 @@ import ChatSidebar from "./ChatSidebar";
 export default function WatchroomContainer({ roomData, onLeaveRoom }) {
   const [participants, setParticipants] = useState(roomData.participants || []);
   const [myRole, setMyRole] = useState(roomData.role || "Participant");
+  const [currentVideoId, setCurrentVideoId] = useState(
+    roomData.initialState?.videoId || "LXb3EKWsInQ"
+  );
   const [notification, setNotification] = useState("");
   const [pendingRequests, setPendingRequests] = useState([]);
 
@@ -32,6 +35,14 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
     const handleHostChanged = ({ hostId, hostName }) => {
       if (hostId === socketService.socket?.id) {
         setMyRole("Host");
+        const saved = sessionStorage.getItem("kinoflow_session");
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            parsed.role = "Host";
+            sessionStorage.setItem("kinoflow_session", JSON.stringify(parsed));
+          } catch (e) {}
+        }
         showNotification(
           "The previous Host left. You have been promoted to Host!",
         );
@@ -43,10 +54,27 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
     // 3. Listen for direct personal promotion/demotion
     const handleRoleAssigned = ({ role }) => {
       setMyRole(role);
+      const saved = sessionStorage.getItem("kinoflow_session");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          parsed.role = role;
+          sessionStorage.setItem("kinoflow_session", JSON.stringify(parsed));
+        } catch (e) {}
+      }
       showNotification(`Your role was updated to: ${role}`);
     };
 
-    // 4. Listen for incoming change requests (For Host/Moderator)
+    // 4. Track active video changes so player re-mounts retain the correct video
+    const handleVideoChanged = ({ videoId }) => {
+      if (videoId) setCurrentVideoId(videoId);
+    };
+
+    const handleSyncState = ({ videoId }) => {
+      if (videoId) setCurrentVideoId(videoId);
+    };
+
+    // 5. Listen for incoming change requests (For Host/Moderator)
     const handleIncomingRequest = (request) => {
       setPendingRequests((prev) => [...prev, request]);
     };
@@ -54,12 +82,16 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
     socketService.on("room_update", handleRoomUpdate);
     socketService.on("host_changed", handleHostChanged);
     socketService.on("role_assigned", handleRoleAssigned);
+    socketService.on("video_changed", handleVideoChanged);
+    socketService.on("sync_state", handleSyncState);
     socketService.on("incoming_change_request", handleIncomingRequest);
 
     return () => {
       socketService.off("room_update", handleRoomUpdate);
       socketService.off("host_changed", handleHostChanged);
       socketService.off("role_assigned", handleRoleAssigned);
+      socketService.off("video_changed", handleVideoChanged);
+      socketService.off("sync_state", handleSyncState);
       socketService.off("incoming_change_request", handleIncomingRequest);
     };
   }, []);
@@ -184,12 +216,12 @@ export default function WatchroomContainer({ roomData, onLeaveRoom }) {
             <HostPlayer
               roomId={roomId}
               isHost={isHost} // Only the primary Host emits the periodic sync heartbeat
-              currentVideoId={roomData.initialState?.videoId || "LXb3EKWsInQ"}
+              currentVideoId={currentVideoId}
             />
           ) : (
             <ParticipantPlayer
               roomId={roomId}
-              currentVideoId={roomData.initialState?.videoId || "LXb3EKWsInQ"}
+              currentVideoId={currentVideoId}
             />
           )}
         </section>
