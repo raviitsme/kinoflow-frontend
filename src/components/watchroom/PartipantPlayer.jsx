@@ -50,13 +50,14 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
   };
 
 
-  // Personal preferences
+  // Personal preferences (local-only, do not affect sync)
   const [volume, setVolume] = useState(50);
   const [isMuted, setIsMuted] = useState(false);
   const [ccActive, setCcActive] = useState(false);
   const [quality, setQuality] = useState('default');
   const [availableQualities, setAvailableQualities] = useState([]);
-  const [speed, setSpeed] = useState(1);
+  // Note: playback speed is intentionally NOT offered to participants.
+  // Changing speed causes permanent drift from the host's tracked currentTime.
 
   useEffect(() => {
     roomIdRef.current = roomId;
@@ -316,13 +317,6 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
     player.setPlaybackQuality(e.target.value);
   };
 
-  const handleSpeedChange = (e) => {
-    const player = playerRef.current;
-    if (!player) return;
-    const rate = parseFloat(e.target.value);
-    setSpeed(rate);
-    player.setPlaybackRate(rate);
-  };
 
   const toggleFullscreen = () => {
     const wrapper = playerWrapperRef.current;
@@ -471,20 +465,6 @@ export default function ParticipantPlayer({ roomId, currentVideoId }) {
               </select>
             </div>
 
-            {/* Speed */}
-            <div className="flex items-center gap-1.5 bg-brand-black/40 border border-brand-border/60 px-2.5 py-1.5 rounded-xl">
-              <span className="text-[10px] uppercase font-bold text-brand-muted">Speed</span>
-              <select
-                value={speed}
-                onChange={handleSpeedChange}
-                className="bg-transparent text-brand-white text-xs font-semibold focus:outline-none cursor-pointer"
-              >
-                <option className="bg-brand-charcoal text-brand-white" value="0.5">0.5x</option>
-                <option className="bg-brand-charcoal text-brand-white" value="1">1.0x (Normal)</option>
-                <option className="bg-brand-charcoal text-brand-white" value="1.5">1.5x</option>
-                <option className="bg-brand-charcoal text-brand-white" value="2">2.0x</option>
-              </select>
-            </div>
           </div>
         </div>
 

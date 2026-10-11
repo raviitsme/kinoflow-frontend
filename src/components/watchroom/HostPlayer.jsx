@@ -176,24 +176,9 @@ export default function HostPlayer({ roomId, isHost, currentVideoId }) {
     };
   }, [roomId, playerReady]);
 
-  // 4. Periodic Alignment Heartbeat (Run only by Room Host to prevent multi-heartbeat collision)
-  useEffect(() => {
-    if (!isHost || !playerReady) return;
+  // 4. Sync heartbeat is now server-driven (socketHandler.js).
+  // No client-side interval needed here anymore.
 
-    const interval = setInterval(() => {
-      const player = playerRef.current;
-      if (player && typeof player.getPlayerState === 'function') {
-        const state = player.getPlayerState();
-        if (state === window.YT.PlayerState.PLAYING) {
-          const time = player.getCurrentTime();
-          // Broadcast periodic 'sync' heartbeat so peers align gracefully without forced seek stutters
-          socketService.emitAction(roomId, 'sync', time);
-        }
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [isHost, playerReady, roomId]);
 
   // 5. Change Video URL
   const handleLoadVideo = (e) => {
